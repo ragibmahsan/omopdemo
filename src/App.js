@@ -12,10 +12,12 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import MedicalInformationIcon from '@mui/icons-material/MedicalInformation';
 import PersonIcon from '@mui/icons-material/Person';
-import { Auth } from 'aws-amplify';
+import { Amplify } from 'aws-amplify';
+import { Auth } from '@aws-amplify/auth';
 import { withAuthenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+
 
 const App = ({ signOut, user }) => {
   const [input, setInput] = useState('');
