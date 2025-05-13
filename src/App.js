@@ -9,20 +9,19 @@ import {
   CircularProgress,
   Avatar
 } from '@mui/material';
-import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import SendIcon from '@mui/icons-material/Send';
 import MedicalInformationIcon from '@mui/icons-material/MedicalInformation';
 import PersonIcon from '@mui/icons-material/Person';
-import { awsConfig } from './aws-config';
+import { Auth } from 'aws-amplify';
+import { withAuthenticator } from '@aws-amplify/ui-react';
+import '@aws-amplify/ui-react/styles.css';
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 
-const App = () => {
+const App = ({ signOut, user }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
-
-  // Initialize the Lambda client
-  const lambdaClient = new LambdaClient(awsConfig);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,52 +41,58 @@ const App = () => {
     setInput('');
 
     try {
-        console.log('Sending request with question:', input);  // Debug log
-        
-        const command = new InvokeCommand({
-            FunctionName: "IST2SQL",
-            Payload: JSON.stringify({ question: input }),
-        });
+      // Get the current session to retrieve the JWT token
+      const session = await Auth.currentSession();
+      const token = session.getIdToken().getJwtToken();
 
-        console.log('Invoking Lambda function...');  // Debug log
-        const response = await lambdaClient.send(command);
-        console.log('Raw Lambda response:', response);  // Debug log
-        
-        const decodedPayload = new TextDecoder().decode(response.Payload);
-        console.log('Decoded payload:', decodedPayload);  // Debug log
-        
-        const parsedResponse = JSON.parse(decodedPayload);
-        console.log('Parsed response:', parsedResponse);  // Debug log
-        
-        const data = JSON.parse(parsedResponse.body);
-        console.log('Final data:', data);  // Debug log
+      // Create Lambda client
+      const lambdaClient = new LambdaClient({
+        region: "us-east-1", // replace with your region
+        credentials: Auth.essentialCredentials(await Auth.currentCredentials())
+      });
 
-        const sqlMessage = { 
-            text: data.sql_query, 
-            sender: 'bot', 
-            type: 'sql' 
-        };
-        setMessages(prev => [...prev, sqlMessage]);
+      // Prepare the Lambda invocation
+      const command = new InvokeCommand({
+        FunctionName: "IST2SQL", // replace with your Lambda function name
+        Payload: JSON.stringify({ 
+          question: input,
+          token: token // Pass the token to your Lambda function
+        }),
+      });
 
-        const summaryMessage = {
-            text: data.summary,
-            sender: 'bot',
-            type: 'summary'
-        };
-        setMessages(prev => [...prev, summaryMessage]);
+      // Invoke Lambda
+      const response = await lambdaClient.send(command);
+      
+      // Parse the response
+      const responsePayload = JSON.parse(new TextDecoder().decode(response.Payload));
+      const data = JSON.parse(responsePayload.body);
+
+      const sqlMessage = { 
+        text: data.sql_query, 
+        sender: 'bot', 
+        type: 'sql' 
+      };
+      setMessages(prev => [...prev, sqlMessage]);
+
+      const summaryMessage = {
+        text: data.summary,
+        sender: 'bot',
+        type: 'summary'
+      };
+      setMessages(prev => [...prev, summaryMessage]);
 
     } catch (error) {
-        console.error('Detailed error:', error);  // More detailed error logging
-        const errorMessage = { 
-            text: `Error: ${error.message}`, // Include the actual error message
-            sender: 'bot',
-            type: 'error'
-        };
-        setMessages(prev => [...prev, errorMessage]);
+      console.error('Detailed error:', error);
+      const errorMessage = { 
+        text: `Error: ${error.message}`,
+        sender: 'bot',
+        type: 'error'
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-};
+  };
 
   return (
     <Container maxWidth="md" sx={{ height: '100vh', py: 4 }}>
@@ -100,17 +105,32 @@ const App = () => {
           overflow: 'hidden'
         }}
       >
-        {/* Header */}
+        {/* Header with User Info */}
         <Box sx={{ 
           p: 2, 
           bgcolor: 'primary.main', 
           color: 'white',
           display: 'flex',
           alignItems: 'center',
-          gap: 1
+          justifyContent: 'space-between'
         }}>
-          <MedicalInformationIcon />
-          <Typography variant="h6">Healthcare SQL Assistant</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <MedicalInformationIcon />
+            <Typography variant="h6">Healthcare SQL Assistant</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="body2">
+              {user.attributes.email}
+            </Typography>
+            <Button 
+              color="inherit" 
+              onClick={signOut}
+              size="small"
+              variant="outlined"
+            >
+              Sign out
+            </Button>
+          </Box>
         </Box>
 
         {/* Messages Area */}
@@ -201,4 +221,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default withAuthenticator(App);
