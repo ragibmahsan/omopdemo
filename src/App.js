@@ -49,19 +49,16 @@ const App = ({ signOut, user }) => {
     setInput('');
 
     try {
-      // Get the current session to retrieve the JWT token
-      const { tokens } = await fetchAuthSession();
-      const token = tokens.idToken.toString();
-
-      // Get current user
-      const user = await getCurrentUser();
-
-      // Create Lambda client
+      // Get the current session credentials
+      const { credentials } = await fetchAuthSession();
+      
+      // Create Lambda client with credentials from the session
       const lambdaClient = new LambdaClient({
         region: "us-east-1", // replace with your region
         credentials: {
-          accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
+          accessKeyId: credentials.accessKeyId,
+          secretAccessKey: credentials.secretAccessKey,
+          sessionToken: credentials.sessionToken
         }
       });
 
@@ -69,9 +66,7 @@ const App = ({ signOut, user }) => {
       const command = new InvokeCommand({
         FunctionName: "IST2SQL", // replace with your Lambda function name
         Payload: JSON.stringify({ 
-          question: input,
-          token: token,
-          userId: user.userId
+          question: input
         }),
       });
 
@@ -108,6 +103,7 @@ const App = ({ signOut, user }) => {
       setIsLoading(false);
     }
 };
+
 
 return (
   <Container maxWidth="md" sx={{ height: '100vh', py: 4 }}>
