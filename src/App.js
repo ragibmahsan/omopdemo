@@ -12,11 +12,11 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import MedicalInformationIcon from '@mui/icons-material/MedicalInformation';
 import PersonIcon from '@mui/icons-material/Person';
-import { Amplify } from 'aws-amplify';
-import { Auth } from '@aws-amplify/auth';
+import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import { withAuthenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+
 
 
 const App = ({ signOut, user }) => {
@@ -44,13 +44,19 @@ const App = ({ signOut, user }) => {
 
     try {
       // Get the current session to retrieve the JWT token
-      const session = await Auth.currentSession();
-      const token = session.getIdToken().getJwtToken();
+      const { tokens } = await fetchAuthSession();
+      const token = tokens.idToken.toString();
+
+      // Get current user
+      const user = await getCurrentUser();
 
       // Create Lambda client
       const lambdaClient = new LambdaClient({
         region: "us-east-1", // replace with your region
-        credentials: Auth.essentialCredentials(await Auth.currentCredentials())
+        credentials: {
+          accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
+        }
       });
 
       // Prepare the Lambda invocation
@@ -58,7 +64,8 @@ const App = ({ signOut, user }) => {
         FunctionName: "IST2SQL", // replace with your Lambda function name
         Payload: JSON.stringify({ 
           question: input,
-          token: token // Pass the token to your Lambda function
+          token: token,
+          userId: user.userId
         }),
       });
 
@@ -94,7 +101,7 @@ const App = ({ signOut, user }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+};
 
   return (
     <Container maxWidth="md" sx={{ height: '100vh', py: 4 }}>
@@ -126,12 +133,19 @@ const App = ({ signOut, user }) => {
             </Typography>
             <Button 
               color="inherit" 
-              onClick={signOut}
+              onClick={async () => {
+                try {
+                  await signOut();
+                } catch (error) {
+                  console.log('error signing out:', error);
+                }
+              }}
               size="small"
               variant="outlined"
             >
               Sign out
-            </Button>
+          </Button>
+
           </Box>
         </Box>
 
