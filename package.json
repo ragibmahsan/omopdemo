@@ -5,7 +5,7 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity": "^3.804.0",
     "@aws-sdk/client-lambda": "^3.804.0",
-    "@aws-sdk/credential-provider-cognito-identity": "^2.4.3",
+    "@aws-sdk/credential-provider-cognito-identity": "^3.804.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
